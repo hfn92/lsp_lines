@@ -114,10 +114,15 @@ function M.show(namespace, bufnr, diagnostics, opts, source)
   for lnum, lelements in pairs(line_stacks) do
     local virt_lines = {}
 
+    -- local extmarks = vim.api.nvim_buf_get_extmarks(bufnr, namespace, { lnum - 1, 0 }, { lnum - 1, 0 }, {})
+    -- vim.notify(vim.inspect(extmarks))
+
     local num_diag = 0
+    local only_diag
     for i = 1, #lelements do
       if lelements[i][1] == DIAGNOSTIC then
         num_diag = num_diag + 1
+        only_diag = lelements[i][2]
       end
     end
 
@@ -126,7 +131,7 @@ function M.show(namespace, bufnr, diagnostics, opts, source)
       --   vim.api.nvim_buf_set_extmark(bnr, ns_id, line_num, 0, opts)
       -- end)
 
-      virt_lines = { { "test", "DiagnosticVirtualTextError" } }
+      virt_lines = { { only_diag.message, highlight_groups[only_diag.severity] } }
       vim.api.nvim_buf_set_extmark(bufnr, namespace, lnum, 0, { virt_text = virt_lines })
 
       -- vim.api.nvim_buf_set_extmark(
