@@ -44,7 +44,9 @@ end
 ---@param opts boolean|Opts
 ---@param source 'native'|'coc'|nil If nil, defaults to 'native'.
 function M.show(namespace, bufnr, diagnostics, opts, source)
-  if not vim.api.nvim_buf_is_loaded(bufnr) then return end
+  if not vim.api.nvim_buf_is_loaded(bufnr) then
+    return
+  end
   vim.validate({
     namespace = { namespace, "n" },
     bufnr = { bufnr, "n" },
@@ -107,100 +109,133 @@ function M.show(namespace, bufnr, diagnostics, opts, source)
     prev_col = diagnostic.col
   end
 
+  -- vim.notify(vim.inspect(line_stacks))
+
   for lnum, lelements in pairs(line_stacks) do
     local virt_lines = {}
 
-    -- We read in the order opposite to insertion because the last
-    -- diagnostic for a real line, is rendered upstairs from the
-    -- second-to-last, and so forth from the rest.
-    for i = #lelements, 1, -1 do -- last element goes on top
+    local num_diag = 0
+    for i = 1, #lelements do
       if lelements[i][1] == DIAGNOSTIC then
-        local diagnostic = lelements[i][2]
-        local empty_space_hi
-        if opts.virtual_lines and opts.virtual_lines.highlight_whole_line == false then
-          empty_space_hi = ""
-        else
-          empty_space_hi = highlight_groups[diagnostic.severity]
-        end
-
-        local left = {}
-        local overlap = false
-        local multi = 0
-
-        -- Iterate the stack for this line to find elements on the left.
-        for j = 1, i - 1 do
-          local type = lelements[j][1]
-          local data = lelements[j][2]
-          if type == SPACE then
-            if multi == 0 then
-              table.insert(left, { data, empty_space_hi })
-            else
-              table.insert(left, { string.rep("─", data:len()), highlight_groups[diagnostic.severity] })
-            end
-          elseif type == DIAGNOSTIC then
-            -- If an overlap follows this, don't add an extra column.
-            if lelements[j + 1][1] ~= OVERLAP then
-              table.insert(left, { "│", highlight_groups[data.severity] })
-            end
-            overlap = false
-          elseif type == BLANK then
-            if multi == 0 then
-              table.insert(left, { "└", highlight_groups[data.severity] })
-            else
-              table.insert(left, { "┴", highlight_groups[data.severity] })
-            end
-            multi = multi + 1
-          elseif type == OVERLAP then
-            overlap = true
-          end
-        end
-
-        local center_symbol
-        if overlap and multi > 0 then
-          center_symbol = "┼"
-        elseif overlap then
-          center_symbol = "├"
-        elseif multi > 0 then
-          center_symbol = "┴"
-        else
-          center_symbol = "└"
-        end
-        -- local center_text =
-        local center = {
-          { string.format("%s%s", center_symbol, "──── "), highlight_groups[diagnostic.severity] },
-        }
-
-        -- TODO: We can draw on the left side if and only if:
-        -- a. Is the last one stacked this line.
-        -- b. Has enough space on the left.
-        -- c. Is just one line.
-        -- d. Is not an overlap.
-
-        local msg
-        if diagnostic.code then
-          msg = string.format("%s: %s", diagnostic.code, diagnostic.message)
-        else
-          msg = diagnostic.message
-        end
-        for msg_line in msg:gmatch("([^\n]+)") do
-          local vline = {}
-          vim.list_extend(vline, left)
-          vim.list_extend(vline, center)
-          vim.list_extend(vline, { { msg_line, highlight_groups[diagnostic.severity] } })
-
-          table.insert(virt_lines, vline)
-
-          -- Special-case for continuation lines:
-          if overlap then
-            center = { { "│", highlight_groups[diagnostic.severity] }, { "     ", empty_space_hi } }
-          else
-            center = { { "      ", empty_space_hi } }
-          end
-        end
+        num_diag = num_diag + 1
       end
     end
 
-    vim.api.nvim_buf_set_extmark(bufnr, namespace, lnum, 0, { virt_lines = virt_lines })
+    if num_diag == 1 then
+      -- local ok, err = pcall(function()
+      --   vim.api.nvim_buf_set_extmark(bnr, ns_id, line_num, 0, opts)
+      -- end)
+
+      virt_lines = { { "test", "DiagnosticVirtualTextError" } }
+      vim.api.nvim_buf_set_extmark(bufnr, namespace, lnum, 0, { virt_text = virt_lines })
+
+      -- vim.api.nvim_buf_set_extmark(
+      --   bufnr,
+      --   namespace,
+      --   lnum,
+      --   0,
+      --   { virt_lines = {
+      --     { { "test", "DiagnosticVirtualTextError" } },
+      --   } }
+      -- )
+    else
+      -- We read in the order opposite to insertion because the last
+      -- diagnostic for a real line, is rendered upstairs from the
+      -- second-to-last, and so forth from the rest.
+      for i = #lelements, 1, -1 do -- last element goes on top
+        if lelements[i][1] == DIAGNOSTIC then
+          local diagnostic = lelements[i][2]
+
+          -- if #lelements == 1 then
+          --   break
+          -- end
+
+          local empty_space_hi
+          if opts.virtual_lines and opts.virtual_lines.highlight_whole_line == false then
+            empty_space_hi = ""
+          else
+            empty_space_hi = highlight_groups[diagnostic.severity]
+          end
+
+          local left = {}
+          local overlap = false
+          local multi = 0
+
+          -- Iterate the stack for this line to find elements on the left.
+          for j = 1, i - 1 do
+            local type = lelements[j][1]
+            local data = lelements[j][2]
+            if type == SPACE then
+              if multi == 0 then
+                table.insert(left, { data, empty_space_hi })
+              else
+                table.insert(left, { string.rep("─", data:len()), highlight_groups[diagnostic.severity] })
+              end
+            elseif type == DIAGNOSTIC then
+              -- If an overlap follows this, don't add an extra column.
+              if lelements[j + 1][1] ~= OVERLAP then
+                table.insert(left, { "│", highlight_groups[data.severity] })
+              end
+              overlap = false
+            elseif type == BLANK then
+              if multi == 0 then
+                table.insert(left, { "└", highlight_groups[data.severity] })
+              else
+                table.insert(left, { "┴", highlight_groups[data.severity] })
+              end
+              multi = multi + 1
+            elseif type == OVERLAP then
+              overlap = true
+            end
+          end
+
+          local center_symbol
+          if overlap and multi > 0 then
+            center_symbol = "┼"
+          elseif overlap then
+            center_symbol = "├"
+          elseif multi > 0 then
+            center_symbol = "┴"
+          else
+            center_symbol = "└"
+          end
+          -- local center_text =
+          local center = {
+            { string.format("%s%s", center_symbol, "──── "), highlight_groups[diagnostic.severity] },
+          }
+
+          -- TODO: We can draw on the left side if and only if:
+          -- a. Is the last one stacked this line.
+          -- b. Has enough space on the left.
+          -- c. Is just one line.
+          -- d. Is not an overlap.
+
+          local msg
+          if diagnostic.code then
+            msg = string.format("%s: %s", diagnostic.code, diagnostic.message)
+          else
+            msg = diagnostic.message
+          end
+          for msg_line in msg:gmatch("([^\n]+)") do
+            local vline = {}
+            vim.list_extend(vline, left)
+            vim.list_extend(vline, center)
+            vim.list_extend(vline, { { msg_line, highlight_groups[diagnostic.severity] } })
+
+            table.insert(virt_lines, vline)
+
+            -- Special-case for continuation lines:
+            if overlap then
+              center = { { "│", highlight_groups[diagnostic.severity] }, { "     ", empty_space_hi } }
+            else
+              center = { { "      ", empty_space_hi } }
+            end
+          end
+        end
+      end
+
+      vim.api.nvim_buf_set_extmark(bufnr, namespace, lnum, 0, { virt_lines = virt_lines })
+    end
   end
 end
 
