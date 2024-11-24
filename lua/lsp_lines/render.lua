@@ -134,7 +134,7 @@ function M.show(namespace, bufnr, diagnostics, opts, source, known_namespaces)
 
     local buffer = vim.api.nvim_get_current_buf() -- Get the current buffer
     local line = vim.api.nvim_buf_get_lines(buffer, lnum, lnum + 1, false)[1]
-    local length = #line
+    local length = line and #line or 0
 
     if not alrdy and num_diag == 1 and length < 80 then
       -- local ok, err = pcall(function()
