@@ -43,7 +43,7 @@ end
 ---@param diagnostics table
 ---@param opts boolean|Opts
 ---@param source 'native'|'coc'|nil If nil, defaults to 'native'.
-function M.show(namespace, bufnr, diagnostics, opts, source)
+function M.show(namespace, bufnr, diagnostics, opts, source, known_namespaces)
   if not vim.api.nvim_buf_is_loaded(bufnr) then
     return
   end
@@ -114,8 +114,14 @@ function M.show(namespace, bufnr, diagnostics, opts, source)
   for lnum, lelements in pairs(line_stacks) do
     local virt_lines = {}
 
-    -- local extmarks = vim.api.nvim_buf_get_extmarks(bufnr, namespace, { lnum - 1, 0 }, { lnum - 1, 0 }, {})
-    -- vim.notify(vim.inspect(extmarks))
+    local alrdy = false
+    for k, _ in pairs(known_namespaces) do
+      local extmarks = vim.api.nvim_buf_get_extmarks(bufnr, k, { lnum, 0 }, { lnum, 0 }, {})
+      -- vim.notify(k .. vim.inspect(extmarks))
+      if #extmarks > 0 then
+        alrdy = true
+      end
+    end
 
     local num_diag = 0
     local only_diag
@@ -126,23 +132,17 @@ function M.show(namespace, bufnr, diagnostics, opts, source)
       end
     end
 
-    if num_diag == 1 then
+    local buffer = vim.api.nvim_get_current_buf() -- Get the current buffer
+    local line = vim.api.nvim_buf_get_lines(buffer, lnum, lnum + 1, false)[1]
+    local length = #line
+
+    if not alrdy and num_diag == 1 and length < 80 then
       -- local ok, err = pcall(function()
       --   vim.api.nvim_buf_set_extmark(bnr, ns_id, line_num, 0, opts)
       -- end)
 
       virt_lines = { { only_diag.message, highlight_groups[only_diag.severity] } }
       vim.api.nvim_buf_set_extmark(bufnr, namespace, lnum, 0, { virt_text = virt_lines })
-
-      -- vim.api.nvim_buf_set_extmark(
-      --   bufnr,
-      --   namespace,
-      --   lnum,
-      --   0,
-      --   { virt_lines = {
-      --     { { "test", "DiagnosticVirtualTextError" } },
-      --   } }
-      -- )
     else
       -- We read in the order opposite to insertion because the last
       -- diagnostic for a real line, is rendered upstairs from the
@@ -215,12 +215,7 @@ function M.show(namespace, bufnr, diagnostics, opts, source)
           -- c. Is just one line.
           -- d. Is not an overlap.
 
-          local msg
-          if diagnostic.code then
-            msg = string.format("%s: %s", diagnostic.code, diagnostic.message)
-          else
-            msg = diagnostic.message
-          end
+          local msg = diagnostic.message
           for msg_line in msg:gmatch("([^\n]+)") do
             local vline = {}
             vim.list_extend(vline, left)

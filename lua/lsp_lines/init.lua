@@ -2,6 +2,8 @@ local M = {}
 
 local render = require("lsp_lines.render")
 
+local known_namespaces = {}
+
 local function render_current_line(diagnostics, ns, bufnr, opts)
   local current_line_diag = {}
   local lnum = vim.api.nvim_win_get_cursor(0)[1] - 1
@@ -14,7 +16,7 @@ local function render_current_line(diagnostics, ns, bufnr, opts)
     end
   end
 
-  render.show(ns, bufnr, current_line_diag, opts)
+  render.show(ns, bufnr, current_line_diag, opts, nil, known_namespaces)
 end
 
 ---@class Opts
@@ -35,11 +37,13 @@ M.setup = function()
     ---@param diagnostics table
     ---@param opts boolean|Opts
     show = function(namespace, bufnr, diagnostics, opts)
-      vim.notify("hello" .. namespace)
+      -- vim.notify("hello" .. namespace)
       local ns = vim.diagnostic.get_namespace(namespace)
       if not ns.user_data.virt_lines_ns then
         ns.user_data.virt_lines_ns = vim.api.nvim_create_namespace("")
       end
+
+      known_namespaces[ns.user_data.virt_lines_ns] = true
 
       vim.api.nvim_clear_autocmds({ group = "LspLines" })
       if opts.virtual_lines.only_current_line then
@@ -53,7 +57,7 @@ M.setup = function()
         -- Also show diagnostics for the current line before the first CursorMoved event
         render_current_line(diagnostics, ns.user_data.virt_lines_ns, bufnr, opts)
       else
-        render.show(ns.user_data.virt_lines_ns, bufnr, diagnostics, opts)
+        render.show(ns.user_data.virt_lines_ns, bufnr, diagnostics, opts, nil, known_namespaces)
       end
     end,
     ---@param namespace number
@@ -72,6 +76,7 @@ end
 M.toggle = function()
   local new_value = not vim.diagnostic.config().virtual_lines
   vim.diagnostic.config({ virtual_lines = new_value })
+  -- vim.diagnostic.get()
   return new_value
 end
 
