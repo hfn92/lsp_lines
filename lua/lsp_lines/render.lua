@@ -134,6 +134,7 @@ function M.show(namespace, bufnr, diagnostics, opts, source, known_namespaces)
 
     local buffer = vim.api.nvim_get_current_buf() -- Get the current buffer
     local line = vim.api.nvim_buf_get_lines(buffer, lnum, lnum + 1, false)[1]
+    -- vim.notify(vim.inspect(line))
     local length = line and #line or 0
 
     if not alrdy and num_diag == 1 and length < 80 then
@@ -141,7 +142,7 @@ function M.show(namespace, bufnr, diagnostics, opts, source, known_namespaces)
       --   vim.api.nvim_buf_set_extmark(bnr, ns_id, line_num, 0, opts)
       -- end)
 
-      virt_lines = { { only_diag.message, highlight_groups[only_diag.severity] } }
+      virt_lines = { { "     " .. only_diag.message, highlight_groups[only_diag.severity] } }
       vim.api.nvim_buf_set_extmark(bufnr, namespace, lnum, 0, { virt_text = virt_lines })
     else
       -- We read in the order opposite to insertion because the last
